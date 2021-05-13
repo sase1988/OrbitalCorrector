@@ -251,14 +251,14 @@ def deltaOrb(X, Y, Z, Omaster, Oslave, DtB0, DtAngPar):
 		Xmr = X[indi[i] + ShAz, MidRange]
 		Ymr = Y[indi[i] + ShAz, MidRange]
 		Zmr = Z[indi[i] + ShAz, MidRange]
-		tcenm1 = timeSincro(0, Xmr, Ymr, Zmr, Omaster)
-		ElliPoi = coordEllipsoid(tcenm1, RgMid, Omaster, Xmr, Ymr, Zmr) #  Calcola corrispondenti punti su ellissoide
-		Versm1 = np.array([orbitV(tcenm1, Omaster, 3), orbitV(tcenm1, Omaster, 4), orbitV(tcenm1, Omaster, 5)])
-		Versm1 = Versm1/np.sqrt(np.sum(Versm1**2))
-		satcen = np.array([orbitV(tcenm1, Omaster, 0), orbitV(tcenm1, Omaster, 1), orbitV(tcenm1, Omaster, 2)])
+		tcenref = timeSincro(0, Xmr, Ymr, Zmr, Omaster)
+		ElliPoi = coordEllipsoid(tcenref, RgMid, Omaster, Xmr, Ymr, Zmr) #  Calcola corrispondenti punti su ellissoide
+		Versref = np.array([orbitV(tcenref, Omaster, 3), orbitV(tcenref, Omaster, 4), orbitV(tcenref, Omaster, 5)])
+		Versref = Versref/np.sqrt(np.sum(Versref**2))
+		satcen = np.array([orbitV(tcenref, Omaster, 0), orbitV(tcenref, Omaster, 1), orbitV(tcenref, Omaster, 2)])
 		rcen = ElliPoi - satcen
 		VrcenV[i,:] = rcen/np.sqrt(np.sum(rcen**2))
-		BperpV[i,:] = crossProduct(Versm1, VrcenV[i,:])
+		BperpV[i,:] = crossProduct(Versref, VrcenV[i,:])
 	
 	Tsn0 = timeSincro(0, X[indi+ShAz,MidRange], Y[indi+ShAz,MidRange], Z[indi+ShAz,MidRange], Oslave)
 	Tsn0m = Tsn0 - np.mean(Tsn0)
@@ -337,10 +337,10 @@ def ecef2lla(x, y, z):
 	
 def OrbitalCorrector(x,y,z,coh,fas,ref,sec,rlook=1,alook=1,gamma=0.25):
 	
-	rgm1 = rangeMat(x, y, z, 0, m1)
-	rgs1 = rangeMat(x, y, z, 0, s1)
+	rgref = rangeMat(x, y, z, 0, ref)
+	rgsec = rangeMat(x, y, z, 0, sec)
 	
-	sint1 = (rgm1 - rgs1)*4*np.pi/0.23513133960784313
+	sint1 = (rgref - rgsec)*4*np.pi/0.23513133960784313
 	fas2 = np.arctan2(np.sin(-fas + sint1), np.cos(-fas + sint1))
 
 	"""Estimación del delta Bperp"""
@@ -357,12 +357,12 @@ def OrbitalCorrector(x,y,z,coh,fas,ref,sec,rlook=1,alook=1,gamma=0.25):
 	for i in range(2):
 		
 		DtB0 = spb[i]
-		s1n0, p = deltaOrb(x, y, z, m1, s1, DtB0, DtAngPar)
+		secn0, p = deltaOrb(x, y, z, ref, sec, DtB0, DtAngPar)
 		
 		# Calcula el nuevo diferencial con la nueva orbita esclava
 		
-		rgs1n = rangeMat(x, y, z, 0, s1n0)
-		sint1n0 = ((rgm1 - rgs1n)*4*np.pi/0.23513133960784313)
+		rgsecn = rangeMat(x, y, z, 0, secn0)
+		sint1n0 = ((rgref - rgsecn)*4*np.pi/0.23513133960784313)
 		Diffp = np.arctan2(np.sin(fas2 - sint1n0), np.cos(fas2 - sint1n0))
 		# ~ Diffp = np.arctan2(rebin(np.sin(fas2 - sint1n0), (300, 500)), rebin(np.cos(fas2 - sint1n0), (300, 500)))
 		# ~ Diffp = np.arctan2(rebin(np.sin(Diffp), (300, 500)), rebin(np.cos(Diffp), (300, 500)))
@@ -402,11 +402,11 @@ def OrbitalCorrector(x,y,z,coh,fas,ref,sec,rlook=1,alook=1,gamma=0.25):
 	for i in range(6):
 		DtB0 = DtBv1 + i*2 - 5
 		DtBvv[i] = DtB0
-		s1n0, p = deltaOrb(x, y, z, m1, s1, DtB0, DtAngPar)
+		secn0, p = deltaOrb(x, y, z, ref, sec, DtB0, DtAngPar)
 		
 		# Calcola nuovo differenziale con la nuova orbita slave
-		rgs1n = rangeMat(x,y,z,0,s1n0)
-		sint1n0 = (rgm1-rgs1n)*4*np.pi/0.23513133960784313
+		rgsecn = rangeMat(x,y,z,0,secn0)
+		sint1n0 = (rgref-rgsecn)*4*np.pi/0.23513133960784313
 		Diffp = np.arctan2(np.sin(fas2-sint1n0), np.cos(fas2-sint1n0))
 		# ~ Diffp = np.arctan2(rebin(np.sin(fas2-sint1n0),(300,500)), rebin(np.cos(fas2-sint1n0),(300,500)))
 		
@@ -421,20 +421,20 @@ def OrbitalCorrector(x,y,z,coh,fas,ref,sec,rlook=1,alook=1,gamma=0.25):
 	#della correzione di B_|_. Lo 0 ci dà la correzione DtB cercata
 
 	# Recordar que np.polyfit da los coeficientes en orden decreciente
-	res1 = np.polyfit(DtBvv, gradv1, deg=1)
-	DtB = -res1[1]/res1[0]
-	# ~ res1 = np.polynomial.polynomial.Polynomial.fit(DtBvv,gradv1,deg=1)
-	# ~ DtB = -res1.coef[1]/res1.coef[0]
+	resec = np.polyfit(DtBvv, gradv1, deg=1)
+	DtB = -resec[1]/resec[0]
+	# ~ resec = np.polynomial.polynomial.Polynomial.fit(DtBvv,gradv1,deg=1)
+	# ~ DtB = -resec.coef[1]/resec.coef[0]
 	
 	print(f'DtBvv: {DtBvv}, gradv1: {gradv1}')
-	print(f'res1: {res1}')
+	print(f'resec: {resec}')
 	print(f'DtB: {DtB}')
 	# ~ DtB = 0
 	# Acá podemos aplicar DtB al de baja y al de alta por separado
 
-	s1n0, p = deltaOrb(x, y, z, m1, s1, DtB, DtAngPar)
-	rgs1n = rangeMat(x,y,z,0,s1n0)
-	sint1n0 = (rgm1-rgs1n)*4*np.pi/0.23513133960784313
+	secn0, p = deltaOrb(x, y, z, ref, sec, DtB, DtAngPar)
+	rgsecn = rangeMat(x,y,z,0,secn0)
+	sint1n0 = (rgref-rgsecn)*4*np.pi/0.23513133960784313
 	Diffp1 = np.arctan2(np.sin(fas2-sint1n0), np.cos(fas2-sint1n0))
 
 
@@ -455,11 +455,11 @@ def OrbitalCorrector(x,y,z,coh,fas,ref,sec,rlook=1,alook=1,gamma=0.25):
 		
 		# Mover la orbita slave original con el DtB ya estimado y el DtAngPar
 		DtAngPar0=spb[i]
-		s1n0,p = deltaOrb(x,y,z,m1,s1,DtB,DtAngPar0)
+		secn0,p = deltaOrb(x,y,z,ref,sec,DtB,DtAngPar0)
 		
 		# Calcola nuovo differenziale con la nuova orbita slave
-		rgs1n=rangeMat(x,y,z,0,s1n0)
-		sint1n0 = (rgm1-rgs1n)*4*np.pi/0.23513133960784313
+		rgsecn=rangeMat(x,y,z,0,secn0)
+		sint1n0 = (rgref-rgsecn)*4*np.pi/0.23513133960784313
 		Diffp =np.arctan2(np.sin(fas2-sint1n0), np.cos(fas2-sint1n0))
 		
 		#Calculo del gradiente en direcciión de azimut:
@@ -490,11 +490,11 @@ def OrbitalCorrector(x,y,z,coh,fas,ref,sec,rlook=1,alook=1,gamma=0.25):
 		
 		DtAngPar0 = DtAngPar + (i*0.0001 - 0.00025)*65
 		DtAngParV[i] = DtAngPar0
-		s1n0,p = deltaOrb(x,y,z,m1,s1,DtB,DtAngPar0)
+		secn0,p = deltaOrb(x,y,z,ref,sec,DtB,DtAngPar0)
 		
 		# Calcola nuovo differenziale con la nuova orbita slave
-		rgs1n=rangeMat(x,y,z,0,s1n0)
-		sint1n0 = (rgm1-rgs1n)*4*np.pi/0.23513133960784313
+		rgsecn=rangeMat(x,y,z,0,secn0)
+		sint1n0 = (rgref-rgsecn)*4*np.pi/0.23513133960784313
 		Diffp =np.arctan2(np.sin(fas2-sint1n0), np.cos(fas2-sint1n0))
 		
 		#Calculo del gradiente en direcciión de azimut:
@@ -504,14 +504,14 @@ def OrbitalCorrector(x,y,z,coh,fas,ref,sec,rlook=1,alook=1,gamma=0.25):
 		gradv1P[i] = np.mean(grad)
 
 	# Recordar que np.polyfit da los coeficientes en orden decreciente	
-	res1P = np.polyfit(DtAngParV,gradv1P, deg=1)
-	DtAngPar = -res1P[1]/res1P[0]
+	resecP = np.polyfit(DtAngParV,gradv1P, deg=1)
+	DtAngPar = -resecP[1]/resecP[0]
 
 	# Calcola e visualizza il differenziale con la B_|_ e  DtAngPar corrette
 
-	s1n0,p = deltaOrb(x,y,z,m1,s1,DtB,DtAngPar)
-	rgs1n=rangeMat(x,y,z,0,s1n0)
-	sint1n0 = (rgm1-rgs1n)*4*np.pi/0.23513133960784313
+	secn0,p = deltaOrb(x,y,z,ref,sec,DtB,DtAngPar)
+	rgsecn=rangeMat(x,y,z,0,secn0)
+	sint1n0 = (rgref-rgsecn)*4*np.pi/0.23513133960784313
 	Diffp1 =np.arctan2(np.sin(fas2-sint1n0), np.cos(fas2-sint1n0))
 	
-	return Diffp1,DtB,DtAng
+	return Diffp1,DtB,DtAngPar
