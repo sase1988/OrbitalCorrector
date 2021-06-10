@@ -18,7 +18,8 @@ class OrbitalCorrector:
 	             rangeLooks=1, 
 	             azimuthLooks=1, 
 	             gamma=0.25,
-	             wavelength=0.23513133960784313
+	             wavelength=0.23513133960784313,
+	             ramp = False
 	             ):
 		
 		self.x = x
@@ -31,6 +32,7 @@ class OrbitalCorrector:
 		self.rlook = rangeLooks
 		self.alook = azimuthLooks
 		self.gamma = gamma
+		self.ramp = ramp
 		self.ml = 0 #If rlooks = 0 and alooks = 0
 		self.wavelength = wavelength
 		self.a = 6378137 #semi-major axis of the WGS84 ellipsoid
@@ -39,6 +41,9 @@ class OrbitalCorrector:
 		
 		if self.rlook != 0 or self.alook != 0:
 			self.ml = 1
+			
+		if self.ramp != False:
+			self.ramp = True
 		
 	def rebin(self, array):
 		rl=self.rlook
@@ -275,6 +280,10 @@ class mainCorrector(OrbitalCorrector):
 		
 		return Diffp
 
+	def calcRamp(self,phase,diffp):
+		ramp = np.arctan2(np.sin(diffp - phase), np.cos(diffp - phase))
+		return ramp
+
 	def grossEstimation(self, coh, phase, rgref, spb, baseline, x, y, z, DtB0=None, DtAngPar0=None):
 		
 		gradv= np.zeros(2)
@@ -360,6 +369,7 @@ class mainCorrector(OrbitalCorrector):
 			y = self.rebin(self.y.copy())
 			z = self.rebin(self.z.copy())
 			coh = self.rebin(self.coh.copy())
+			phase_hr =  self.phase.copy()
 			phase = self.rebin(self.phase.copy())
 			rgref_hr = self.rangeMat(self.x, self.y, self.z, 0, self.ref)
 			rgsec_hr = self.rangeMat(self.x, self.y, self.z, 0, self.sec)
@@ -404,7 +414,7 @@ class mainCorrector(OrbitalCorrector):
 		# Acá podemos aplicar DtB al de baja y al de alta por separado
 
 		Diffp1 = self.newDifferential(phase2, rgref, self.sec, DtB, DtAngPar, x, y, z)
-		
+			
 		########################### PARALELA ###########################
 		########## Ricerca su parallela +/- .0005*65 metri/sec #########
 
@@ -440,6 +450,14 @@ class mainCorrector(OrbitalCorrector):
 			                                 self.y, 
 			                                 self.z
 			                                )
-			return Diffp1_hr, DtB, DtAngPar
+			if self.ramp:
+				fringe = self.calcRamp(phase_hr,Diffp1_hr)
+				return Diffp1_hr, DtB, DtAngPar, fringe
+			else:
+				return Diffp1_hr, DtB, DtAngPar
 			
-		return Diffp1, DtB, DtAngPar
+		if self.ramp:
+			fringe = self.calcRamp(phase,Diffp1)
+			return Diffp1, DtB, DtAngPar, fringe
+		else:
+			return Diffp1, DtB, DtAngPar
