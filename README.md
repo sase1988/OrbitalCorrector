@@ -1,7 +1,7 @@
 # SAOCOM-1 Orbital Corrector Module
 ------
-Edinson Andrés Solarte Casanova (CONICET, Argentina)
-Santiago Seppi (CONAE, Argentina)
+Edinson Andrés Solarte Casanova (CONICET, Argentina)  
+Santiago Seppi (CONAE, Argentina)  
 Yenni L. Belen Roa (CONICET, Argentina)
 
 # Description:
